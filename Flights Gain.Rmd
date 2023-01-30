@@ -1,0 +1,386 @@
+---
+title: "UA Flights Flight Gain Analysis"
+author: "Wai Chun (Jun) Chong"
+output: 
+  html_document:
+    toc: true
+    toc_float: 
+      collapsed: false
+      smooth_scroll: false
+    toc_depth: 2
+    number_sections: true
+date: "15 November 2022"
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(fig.align = 'center', include = TRUE, echo = FALSE, eval = TRUE, warning = FALSE, message = FALSE)
+```
+
+```{r data and packages}
+library(nycflights13)
+library(tidyverse)
+library(knitr)
+```
+
+# Executive Summary
+Lately, there has been a concern about the flight planning from the customers. We have been hearing some voices about the **flight delay, flight departure, and flight arrival**. In the long term, this will create a repercussion about UA's reputation if it is not resolved. Therefore, I am hereby consider the **Gain** of each flight, that is how much quicker the flight ended up being than planned, to see if this issue is a big concern that require prompt action to resolve.   
+
+After some foundational research, we have come to a solution that the **gain of each flight** could be different for different **delay departure** of the flights and the **flight duration**. To avoid the effect of deviation merely based on the **flights length**, we will take two measure of interest to analyze each separate cases, which are the **average net gain** and the **relative net gain**.   
+
+The cases of concern are summarized below:  
+  - **Average gain of late flights**  
+  - **Average gain of the most common destination airport from New York City**  
+  - **Relative gain of late flights**  
+  - **Relative gain of length of flights**  
+  
+After the analysis, we can conclude that there are statistically significant difference between the **average net gain** and **average relative net gain** of each cases. Besides, based on the analysis of the **gain distribution of the most common destination airports**, we can say that the gains are mostly surrounded between **0 to 50**. Therefore, this can strengthen the reasoning that why there is **significant difference of average net gain and average relative net gain** of each cases.  
+  
+In the conclusion, we can say that there is a serious issue about the flights delay and flight planning we are having so far. Therefore, we would have to reduce the flights delay, flights length, and work on flight planning as a priority to improve the efficiency and customer satisfaction.  
+
+\newpage
+
+# Analysis  
+To improve both efficiency and customer satisfaction, I would mainly focus study the gain per flight - that is, how much quicker the flight ended up being than planned. We can find the net gain by subtracting the arrival delay from the departure delay.  
+
+1. **Average Net Gain**  
+- Late Departure  
+- Very Late Departure  
+2. **Average Net Gain of The Most Common Destination Airport**  
+3. **Relative Net Gain**  
+- Late Departure  
+- Very Late Departure  
+4. **Relative Net Gain based on Flight Duration**  
+- Long Flights vs Short Flights  
+
+```{r flights datasets, include = FALSE}
+flights
+head(flights)
+```
+
+```{r, include = FALSE}
+df <- flights %>%
+  mutate(gain = dep_delay - arr_delay,
+         late = dep_delay > 0,
+         very_late = dep_delay > 30) %>%
+  filter(carrier == 'UA')
+
+head(df)
+```
+
+## Average Net Gain  
+
+1. Does the average gain differ for flights that departed late versus those that did not? What about for flights that departed more than 30 minutes late?  
+
+Let's define late flights as flights with late departure and very late flights be flights that departed late for more than 30 mins.  
+
+### Late Departure  
+$H_0: \overline{g}_{late} = \overline{g}_{-late}$  
+$H_a: \overline{g}_{late} ≠ \overline{g}_{-late}$  
+
+```{r}
+kable(tapply(df$gain, df$late, mean, na.rm = TRUE), 
+      col.names = c("Mean"),
+      align = 'ccc', 
+      caption = 'Table 1.1 The Average Gain of Late Flights')
+```
+
+```{r}
+Gain <- subset(df, select = gain, drop = TRUE)
+
+Gain.late <- subset(df, select = gain, subset = late == TRUE, drop = TRUE)
+
+Gain.not.late <- subset(df, select = gain, subset = late == FALSE, drop = TRUE)
+
+```
+
+```{r}
+observed <- mean(Gain.late, na.rm = TRUE) - mean(Gain.not.late, na.rm = TRUE)
+```
+
+
+```{r}
+# Permutation Test
+N <- 10^3 - 1
+
+result <- numeric(N)
+
+sample.size <- nrow(df)
+
+group.1.size <- nrow(df[df$late==TRUE,])
+
+#use a for loop to cycle through values of i ranging from 1 to N
+for(i in 1:N)
+{
+  index <- sample(sample.size, size=group.1.size, replace = FALSE)
+
+  result[i] <- mean(Gain[index], na.rm = TRUE) - mean(Gain[-index], na.rm = TRUE)
+}
+
+p <- 2 * (sum(result <= observed) + 1) / (N + 1)
+
+```
+
+In the conclusion, since p-value is `r p` (less than 0.05), it is statistically significant to say that there is a difference of average gain between late flights and not late flights.  
+
+### Very Late Departure  
+
+
+$H_0: \overline{g}_{verylate} = \overline{g}_{-verylate}$  
+$H_a: \overline{g}_{verylate} ≠ \overline{g}_{-verylate}$  
+
+```{r}
+kable(tapply(df$gain, df$very_late, mean, na.rm = TRUE), 
+      col.names = c("Mean"),
+      align = 'ccc', 
+      caption = 'Table 1.2 The Average Gain of Very Late Flights')
+```
+
+```{r}
+Gain <- subset(df, select = gain, drop = TRUE)
+
+Gain.very.late <- subset(df, select = gain, subset = very_late == TRUE, drop = TRUE)
+
+Gain.not.very.late <- subset(df, select = gain, subset = very_late == FALSE, drop = TRUE)
+```
+
+```{r}
+observed <- mean(Gain.very.late, na.rm = TRUE) - mean(Gain.not.very.late, na.rm = TRUE)
+
+# Permutation Test
+N <- 10^3 - 1
+
+result <- numeric(N)
+
+sample.size <- nrow(df)
+
+group.1.size <- nrow(df[df$very_late==TRUE,])
+
+#use a for loop to cycle through values of i ranging from 1 to N
+for(i in 1:N)
+{
+  index <- sample(sample.size, size=group.1.size, replace = FALSE)
+
+  result[i] <- mean(Gain[index], na.rm = TRUE) - mean(Gain[-index], na.rm = TRUE)
+}
+
+p <- 2 * (sum(result <= observed) + 1) / (N + 1)
+
+```
+
+In the conclusion, since p-value is `r p` (less than 0.05), it is statistically significant to say that there is a difference of average gain between very late flights and not very late flights.  
+
+## Average Net Gain of The Most Common Destination Airport  
+
+2.	What are the five most common destination airports for United Airlines flights from New York City? Describe the distribution and the average gain for each of these five airports.  
+	
+```{r}
+top.5.airport <- df %>% 
+  filter(origin %in% c('LGA', 'EWR', 'JFK')) %>%
+  count(dest, sort = TRUE) %>%
+  top_n(5)
+
+kable(top.5.airport,
+      col.names = c('Destination', 'Frequency'),
+      align = 'ccc',
+      caption = 'Table 2.1 Top 5 Destination Airports from New York City Airports')
+```
+
+
+```{r Top 5 Average Gain Distribution, fig.dim = c(5,3), out.width="85%", fig.cap = "Figure 2.1 The Average Gain Distribution of the Top 5 Most Common Destination Airports from New York City Airports"}
+top.5.gain <- df %>%
+  filter(dest %in% top.5.airport$dest) %>%
+  select(dest, gain) 
+
+top.5.gain %>%
+  ggplot(aes(x = gain, fill = dest, color = dest)) + 
+    geom_histogram(alpha = 0.5, position = "identity") +
+    facet_wrap(~dest) +
+  ggtitle('The Average Gain Distribution') +
+  xlab('Gains') +
+  ylab('Frequency')
+```
+
+The histograms above show the distribution of the gain of each of these top 5 airports. Each of these airports distribution show a similarity in having a modal peak at a gain around 0-50 (mainly 5-10 as shown at the table below). The difference is the frequency of the peak frequency which is dependent on the count of each airports destination from New York airports.  
+
+
+```{r Top 5 Average Gain}
+kable(top.5.gain %>%
+  group_by(dest) %>%
+  summarize(average = mean(gain, na.rm = TRUE)),
+  col.names = c("Destination", "Average"),
+  align = 'ccc',
+  captions = 'Table 2.2 The Average Net Gain of the Top 5 Most Common Destination Airport'
+)
+```
+
+## Relative Net Gain  
+
+3.	Another common measure of interest, in addition to total gain, is the gain relative to the duration of the flight. Calculate the gain per hour by dividing the total gain by the duration in hours of each flight. Does the average gain per hour differ for flights that departed late versus those that did not? What about for flights that departed more than 30 minutes late?  
+	
+```{r, include = FALSE}
+df.2 <- df %>%
+  mutate(gain_per_hour = gain/hour)
+
+head(df.2)
+```
+
+### Late Departure   
+	
+$H_0: \overline{rel.g}_{late} = \overline{rel.g}_{-late}$  
+$H_a: \overline{rel.g}_{late} ≠ \overline{rel.g}_{-late}$  
+	
+```{r}
+kable(tapply(df.2$gain_per_hour, df.2$late, mean, na.rm = TRUE), 
+      col.names = c("Mean"),
+      align = 'ccc', 
+      caption = 'Table 3.1 The Average Relative Gain of Late Flights')
+```
+
+```{r}
+rel.Gain <- subset(df.2, select = gain_per_hour, drop = TRUE)
+
+rel.Gain.late <- subset(df.2, select = gain_per_hour, subset = late == TRUE, drop = TRUE)
+
+rel.Gain.not.late <- subset(df.2, select = gain_per_hour, subset = late == FALSE, drop = TRUE)
+```
+
+```{r}
+observed <- mean(rel.Gain.late, na.rm = TRUE) - mean(rel.Gain.not.late, na.rm = TRUE)
+```
+
+
+```{r}
+# Permutation Test
+N <- 10^3 - 1
+
+result <- numeric(N)
+
+sample.size <- nrow(df.2)
+
+group.1.size <- nrow(df.2[df.2$late==TRUE,])
+
+#use a for loop to cycle through values of i ranging from 1 to N
+for(i in 1:N)
+{
+  index <- sample(sample.size, size=group.1.size, replace = FALSE)
+
+  result[i] <- mean(rel.Gain[index], na.rm = TRUE) - mean(rel.Gain[-index], na.rm = TRUE)
+}
+
+p <- 2 * (sum(result <= observed) + 1) / (N + 1)
+
+```
+
+In the conclusion, since p-value is `r p` (less than 0.05), it is statistically significant to say that there is a difference of average relative gain between late flights and not late flights.   
+
+### Very Late Departure  
+
+$H_0: \overline{rel.g}_{verylate} = \overline{rel.g}_{-verylate}$  
+$H_a: \overline{rel.g}_{verylate} ≠ \overline{rel.g}_{-verylate}$
+
+```{r}
+kable(tapply(df.2$gain_per_hour, df.2$very_late, mean, na.rm = TRUE), 
+      col.names = c("Mean"),
+      align = 'ccc', 
+      caption = 'Table 3.2 The Average Relative Gain of Very Late Flights')
+
+```
+
+```{r}
+rel.Gain <- subset(df.2, select = gain_per_hour, drop = TRUE)
+
+rel.Gain.very.late <- subset(df.2, select = gain_per_hour, subset = very_late == TRUE, drop = TRUE)
+
+rel.Gain.not.very.late <- subset(df.2, select = gain_per_hour, subset = very_late == FALSE, drop = TRUE)
+
+```
+
+```{r}
+observed <- mean(rel.Gain.very.late, na.rm = TRUE) - mean(rel.Gain.not.very.late, na.rm = TRUE)
+```
+
+```{r}
+# Permutation Test
+N <- 10^3 - 1
+
+result <- numeric(N)
+
+sample.size <- nrow(df.2)
+
+group.1.size <- nrow(df.2[df.2$very_late==TRUE,])
+
+#use a for loop to cycle through values of i ranging from 1 to N
+for(i in 1:N)
+{
+  index <- sample(sample.size, size=group.1.size, replace = FALSE)
+
+  result[i] <- mean(rel.Gain[index], na.rm = TRUE) - mean(rel.Gain[-index], na.rm = TRUE)
+}
+
+p <- 2 * (sum(result <= observed) + 1) / (N + 1)
+```
+
+In the conclusion, since p-value is `r p` (less than 0.05), it is statistically significant to say that there is a difference of average relative gain between very late flights and not very late flights.   
+
+## Relative Net Gain based on Flight Duration  
+
+4.	Does the average gain per hour differ for longer flights versus shorter flights?  
+	
+```{r, include = FALSE}
+mean(df.2$air_time, na.rm = TRUE)
+```
+$Mean=211.7914$  
+
+Let longer flights be airborne flights time longer than and equal to 212 mins and shorter flights be airborne flights time shorter than 212 mins.   
+
+### Long Flights vs Short Flights  
+
+$H_0: G_{ave, t\underline{>}212} = G_{ave, t<212}$  
+$H_A: G_{ave, t\underline{>}212} ≠ G_{ave, t<212}$  
+```{r}
+df.3 <- df.2 %>%
+  mutate(flight.length = air_time >= 212)
+```
+
+```{r}
+kable(tapply(df.3$gain_per_hour, df.3$flight.length, mean, na.rm = TRUE), 
+      col.names = c("Mean"),
+      align = 'ccc', 
+      caption = 'Table 4.1 The Average Relative Gain of Long and Short Flights')
+
+```
+
+```{r}
+rel.Gain <- subset(df.3, select = gain_per_hour, drop = TRUE)
+
+rel.Gain.long.flight <- subset(df.3, select = gain_per_hour, subset = flight.length == TRUE, drop = TRUE)
+
+rel.Gain.short.flight <- subset(df.3, select = gain_per_hour, subset = flight.length == FALSE, drop = TRUE)
+```
+
+```{r}
+observed <- mean(rel.Gain.long.flight, na.rm = TRUE) - mean(rel.Gain.short.flight, na.rm = TRUE)
+```
+
+```{r}
+# Permutation Test
+N <- 10^3 - 1
+
+result <- numeric(N)
+
+sample.size <- nrow(df.3)
+
+group.1.size <- nrow(df.3[df.3$flight.length==TRUE,])
+
+#use a for loop to cycle through values of i ranging from 1 to N
+for(i in 1:N)
+{
+  index <- sample(sample.size, size=group.1.size, replace = FALSE)
+
+  result[i] <- mean(rel.Gain[index], na.rm = TRUE) - mean(rel.Gain[-index], na.rm = TRUE)
+}
+
+p <- 2 * (sum(result <= observed) + 1) / (N + 1)
+```
+
+In the conclusion, since p-value is `r p` (less than 0.05), it is statistically significant to say that there is a difference of average relative gain between long flights and short flights.   
